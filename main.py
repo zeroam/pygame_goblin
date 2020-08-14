@@ -1,5 +1,7 @@
-from pathlib import Path
 import pygame
+import random
+from abc import ABC, abstractmethod
+from pathlib import Path
 
 base_dir = Path(__file__).parent.absolute()
 data_dir = base_dir / "data"
@@ -10,13 +12,8 @@ pygame.init()
 
 win = pygame.display.set_mode((500, 500))
 
-pygame.display.set_caption("Fisrt Game")
+pygame.display.set_caption("Goblin Game")
 
-walkLeft = []
-walkRight = []
-for i in range(1, 10):
-    walkLeft.append(pygame.image.load(str(data_dir / f"L{i}.png")))
-    walkRight.append(pygame.image.load(str(data_dir / f"R{i}.png")))
 bg = pygame.image.load(str(data_dir / "bg.jpg"))
 char = pygame.image.load(str(data_dir / "standing.png"))
 
@@ -29,17 +26,35 @@ clock = pygame.time.Clock()
 score = 0
 
 
-class Player(object):
-    def __init__(self, x, y, width, height):
+class Character(ABC):
+    def __init__(self, x, y, width, height, vel):
         self.x = x
         self.y = y
         self.width = width
         self.height = height
-        self.vel = 5
+        self.vel = vel
+        self.walkCount = 0
+
+    @abstractmethod
+    def draw(self, window):
+        """Draw character"""
+        pass
+
+    @abstractmethod
+    def hit(self):
+        """Action when hitted"""
+        pass
+
+
+class Player(Character):
+    walkRight = [pygame.image.load(str(data_dir / f"R{i}.png")) for i in range(1, 10)]
+    walkLeft = [pygame.image.load(str(data_dir / f"L{i}.png")) for i in range(1, 10)]
+
+    def __init__(self, x, y, width, height, vel=5):
+        super().__init__(x, y, width, height, vel)
         self.isJump = False
         self.left = False
         self.right = False
-        self.walkCount = 0
         self.jumpCount = 10
         self.standing = True
         self.hitbox = (self.x + 17, self.y + 11, 29, 52)
@@ -50,16 +65,16 @@ class Player(object):
 
         if not self.standing:
             if self.left:
-                win.blit(walkLeft[self.walkCount // 3], (self.x, self.y))
+                win.blit(self.walkLeft[self.walkCount // 3], (self.x, self.y))
                 self.walkCount += 1
             elif self.right:
-                win.blit(walkRight[self.walkCount // 3], (self.x, self.y))
+                win.blit(self.walkRight[self.walkCount // 3], (self.x, self.y))
                 self.walkCount += 1
         else:
             if self.right:
-                win.blit(walkRight[0], (self.x, self.y))
+                win.blit(self.walkRight[0], (self.x, self.y))
             else:
-                win.blit(walkLeft[0], (self.x, self.y))
+                win.blit(self.walkLeft[0], (self.x, self.y))
 
         self.hitbox = (self.x + 17, self.y + 11, 29, 52)
         # pygame.draw.rect(win, (255, 0, 0), self.hitbox, 2)
@@ -86,19 +101,14 @@ class Player(object):
                     pygame.quit()
 
 
-class Enemy(object):
+class Enemy(Character):
     walkRight = [pygame.image.load(str(data_dir / f"R{i}E.png")) for i in range(1, 12)]
     walkLeft = [pygame.image.load(str(data_dir / f"L{i}E.png")) for i in range(1, 12)]
 
-    def __init__(self, x, y, width, height, end):
-        self.x = x
-        self.y = y
-        self.width = width
-        self.height = height
+    def __init__(self, x, y, width, height, end, vel=3):
+        super().__init__(x, y, width, height, vel)
         self.end = end
         self.path = [self.x, self.end]
-        self.walkCount = 0
-        self.vel = 3
         self.hitbox = (self.x + 17, self.y + 2, 31, 57)
         self.health = 10
         self.visible = True
@@ -140,8 +150,10 @@ class Enemy(object):
 
     def hit(self):
         if self.health > 0:
+            hit_sound.play()
             self.health -= 1
-        else:
+
+        if self.health == 0:
             self.visible = False
 
 
@@ -164,7 +176,8 @@ def redrawGameWindow():
     win.blit(text, (380, 10))
 
     man.draw(win)
-    goblin.draw(win)
+    for goblin in goblins:
+        goblin.draw(win)
 
     for bullet in bullets:
         bullet.draw(win)
@@ -175,9 +188,12 @@ def redrawGameWindow():
 # main loop
 font = pygame.font.SysFont("comicsans", 30, True)
 man = Player(300, 410, 64, 64)
-goblin = Enemy(100, 410, 64, 64, 450)
+goblins = []
 bullets = []
 shoot_loop = 0
+enemy_loop = 0
+dead_loop = 0
+is_dead = False
 run = True
 while run:
     clock.tick(27)
@@ -186,11 +202,32 @@ while run:
         if event.type == pygame.QUIT:
             run = False
 
-    if goblin.visible:
+    if is_dead:
+        dead_loop += 1
+
+    if dead_loop > 30:
+        dead_loop = 0
+        is_dead = False
+
+    if len(goblins) < 3:
+        if enemy_loop == 0:
+            start = random.randint(0, 100)
+            end = random.randint(300, 450)
+            goblins.append(Enemy(start, 410, 64, 64, end))
+        enemy_loop += 1
+
+    if enemy_loop > 30:
+        enemy_loop = 0
+
+    for goblin in goblins:
+        if is_dead:
+            break
+
         if man.hitbox[1] < goblin.hitbox[1] + goblin.hitbox[3] and man.hitbox[1] + man.hitbox[3] > goblin.hitbox[1]:
             if man.hitbox[0] + man.hitbox[2] > goblin.hitbox[0] and man.hitbox[0] < goblin.hitbox[0] + goblin.hitbox[2]:
                 man.hit()
                 score -= 5
+                is_dead = True
 
     if shoot_loop > 0:
         shoot_loop += 1
@@ -198,12 +235,14 @@ while run:
         shoot_loop = 0
 
     for i, bullet in enumerate(bullets):
-        if bullet.y + bullet.radius < goblin.hitbox[1] + goblin.hitbox[3] and bullet.y > goblin.hitbox[1]:
-            if bullet.x > goblin.hitbox[0] and bullet.x + bullet.radius < goblin.hitbox[0] + goblin.hitbox[2]:
-                hit_sound.play()
-                goblin.hit()
-                score += 1
-                bullets.pop(i)
+        for goblin in goblins:
+            if bullet.y + bullet.radius < goblin.hitbox[1] + goblin.hitbox[3] and bullet.y > goblin.hitbox[1]:
+                if bullet.x > goblin.hitbox[0] and bullet.x + bullet.radius < goblin.hitbox[0] + goblin.hitbox[2]:
+                    goblin.hit()
+                    score += 1
+                    bullets.pop(i)
+                    if goblin.health == 0:
+                        goblins.pop(goblins.index(goblin))
 
         if bullet.x < 500 and bullet.x > 0:
             bullet.x += bullet.vel

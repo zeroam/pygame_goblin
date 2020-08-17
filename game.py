@@ -1,6 +1,8 @@
+import time
 import random
 import pygame
 from typing import List
+import threading
 
 from settings import data_dir
 from character import Player, Enemy, Projectile
@@ -11,13 +13,21 @@ class Game(object):
         self.width = width
         self.height = height
         self.score = 0
+        self.time = 100
 
         self.win = None
         self.bg = None
         self.clock = None
+
+        # sound
         self.bullet_sound = None
+        self.bullet_sound_on = True
         self.hit_sound = None
+        self.hit_sound_on = True
+
+        # font
         self.font = None
+        self.font_notify = None
 
         # characters
         self.man: Player = Player(300, self.height - 105, 64, 64)
@@ -57,6 +67,7 @@ class Game(object):
 
         # font
         self.font = pygame.font.SysFont("comicsans", 30, True)
+        self.font_notify = pygame.font.SysFont("comicsans", 50, True)
 
     def loop_check(self):
         # shoot loop
@@ -126,21 +137,34 @@ class Game(object):
                 man.jumpCount = 10
 
 
+    def time_thread(self):
+        while self.time > 0:
+            time.sleep(1)
+            self.time -= 1
+
+
     def redraw_game_window(self):
         win = self.win
-        man = self.man
-        goblins = self.goblins
-        bullets = self.bullets
 
         win.blit(self.bg, (0, 0))
-        text = self.font.render(f"Score: {self.score}", 1, (0, 0, 0))
-        win.blit(text, (self.width - 130, 10))
 
-        man.draw(win)
-        for goblin in goblins:
+        score_text = self.font.render(f"Score: {self.score}", 1, (0, 0, 0))
+        win.blit(score_text, (self.width - 130, 10))
+        time_text = self.font.render(f"TIME: {self.time}", 1, (0, 0, 0))
+        win.blit(time_text, (self.width // 2 - 50, 10))
+
+        # TIME OVER
+        if self.time == 0:
+            time_over_text = self.font_notify.render(f"TIME OVER", 1, (255, 0, 0))
+            self.win.blit(time_over_text, (self.width // 2 - 100, 100))
+
+        if self.dead_loop % 2 == 0:
+            self.man.draw(win)
+
+        for goblin in self.goblins:
             goblin.draw(win)
 
-        for bullet in bullets:
+        for bullet in self.bullets:
             bullet.draw(win)
 
         pygame.display.update()
@@ -148,12 +172,17 @@ class Game(object):
     def start(self):
         self.initialize()
 
+        # time counting thread
+        time_t = threading.Thread(target=self.time_thread, daemon=True)
+        time_t.start()
+
         # main loop
         man = self.man
         run = True
         while run:
             self.clock.tick(27)
 
+            # handling exit event
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     run = False
@@ -168,8 +197,9 @@ class Game(object):
                     self.goblins.append(Enemy(start, self.height - 100, 64, 64, end))
                 self.enemy_loop += 1
 
+            # goblins hit player
             for goblin in self.goblins:
-                if self.dead_loop > 0:
+                if self.dead_loop > 0 or self.time == 0:
                     break
 
                 if man.hitbox[1] < goblin.hitbox[1] + goblin.hitbox[3] and man.hitbox[1] + man.hitbox[3] > goblin.hitbox[1]:
@@ -179,7 +209,11 @@ class Game(object):
                         self.score -= 5
                         self.dead_loop = 1
 
+            # bullets hit goblins
             for bullet in self.bullets:
+                if self.time == 0:
+                    break
+
                 for goblin in self.goblins:
                     if bullet.y + bullet.radius < goblin.hitbox[1] + goblin.hitbox[3] and bullet.y > goblin.hitbox[1]:
                         if bullet.x > goblin.hitbox[0] and bullet.x + bullet.radius < goblin.hitbox[0] + goblin.hitbox[2]:

@@ -35,8 +35,11 @@ class Player(Character):
         self.isJump = False
         self.left = False
         self.right = False
+
         self.walkCount = 0
         self.jumpCount = 10
+        self.lives = 3
+
         self.hitbox = (self.x + 17, self.y + 11, 29, 52)
 
     def draw(self, win):
@@ -65,9 +68,11 @@ class Player(Character):
         self.walkCount = 0
 
         font = pygame.font.SysFont("comicsans", 100)
-        text = font.render("-5", 1, (255, 0, 0))
+        text = font.render("-1", 1, (255, 0, 0))
         win.blit(text, (250 - (text.get_width() // 2), 200))
         pygame.display.update()
+
+        self.lives -= 1
 
         i = 0
         while i < 100:

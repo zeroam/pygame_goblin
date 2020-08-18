@@ -12,22 +12,37 @@ class Game(object):
     def __init__(self, width: int, height: int):
         self.width = width
         self.height = height
+
+        pygame.init()
+
+        # window
+        self.win = pygame.display.set_mode((self.width, self.height))
+
+        # background
+        self.bg = pygame.image.load(str(data_dir / "bg.jpg"))
+
+        # clock
+        self.clock = pygame.time.Clock()
+
+        # sound
+        self.bullet_sound = pygame.mixer.Sound(str(data_dir / "bullet.ogg"))
+        self.hit_sound = pygame.mixer.Sound(str(data_dir / "hit.ogg"))
+        self.music = pygame.mixer.music.load(str(data_dir / "music.mp3"))
+        self.bgm_on = True
+        self.effect_on = True
+
+        # font
+        self.font = pygame.font.SysFont("comicsans", 30)
+        self.font_bold = pygame.font.SysFont("comicsans", 30, True)
+        self.font_notify = pygame.font.SysFont("comicsans", 50, True)
+
+
+    def initialize(self):
         self.score = 0
         self.time = 100
 
-        self.win = None
-        self.bg = None
-        self.clock = None
-
-        # sound
-        self.bullet_sound = None
-        self.bullet_sound_on = True
-        self.hit_sound = None
-        self.hit_sound_on = True
-
-        # font
-        self.font = None
-        self.font_notify = None
+        if self.bgm_on:
+            pygame.mixer.music.play(-1)
 
         # characters
         self.man: Player = Player(300, self.height - 105, 64, 64)
@@ -46,28 +61,6 @@ class Game(object):
         # limits
         self.bullets_limit = 5
         self.enemies_limit = 3
-
-    def initialize(self):
-        pygame.init()
-
-        # window
-        self.win = pygame.display.set_mode((self.width, self.height))
-
-        # background
-        self.bg = pygame.image.load(str(data_dir / "bg.jpg"))
-
-        # clock
-        self.clock = pygame.time.Clock()
-
-        # sound
-        self.bullet_sound = pygame.mixer.Sound(str(data_dir / "bullet.ogg"))
-        self.hit_sound = pygame.mixer.Sound(str(data_dir / "hit.ogg"))
-        self.music = pygame.mixer.music.load(str(data_dir / "music.mp3"))
-        pygame.mixer.music.play(-1)
-
-        # font
-        self.font = pygame.font.SysFont("comicsans", 30, True)
-        self.font_notify = pygame.font.SysFont("comicsans", 50, True)
 
     def loop_check(self):
         # shoot loop
@@ -100,7 +93,8 @@ class Game(object):
         if keys[pygame.K_SPACE] and self.shoot_loop == 0:
             if len(self.bullets) < self.bullets_limit:
                 facing = 1 if man.right else -1
-                self.bullet_sound.play()
+                if self.effect_on:
+                    self.bullet_sound.play()
                 self.bullets.append(Projectile(man.x + man.width // 2, man.y + man.height // 2, 6, (0, 0, 0), facing))
 
             self.shoot_loop = 1
@@ -138,8 +132,12 @@ class Game(object):
 
 
     def time_thread(self):
-        while self.time > 0:
+        while True:
             time.sleep(1)
+
+            if self.man.lives == 0 or self.time == 0:
+                continue
+
             self.time -= 1
 
 
@@ -149,14 +147,24 @@ class Game(object):
         win.blit(self.bg, (0, 0))
 
         score_text = self.font.render(f"Score: {self.score}", 1, (0, 0, 0))
-        win.blit(score_text, (self.width - 130, 10))
+        win.blit(score_text, (self.width - 110, 10))
         time_text = self.font.render(f"TIME: {self.time}", 1, (0, 0, 0))
         win.blit(time_text, (self.width // 2 - 50, 10))
+        live_text = self.font.render(f"lives: {self.man.lives}", 1, (0, 0, 0))
+        win.blit(live_text, (20, 10))
 
-        # TIME OVER
-        if self.time == 0:
-            time_over_text = self.font_notify.render(f"TIME OVER", 1, (255, 0, 0))
-            self.win.blit(time_over_text, (self.width // 2 - 100, 100))
+        if self.man.lives == 0 or self.time == 0:
+            if self.man.lives == 0:
+                text = "GAME OVER"
+            elif self.time == 0:
+                text = "TIME OVER"
+
+            game_over_text = self.font_notify.render(text, 1, (255, 0, 0))
+            self.win.blit(game_over_text, (self.width // 2 - 100, 100))
+            restart_text = self.font_bold.render("PRESS 'r' TO RESTART", 1, (0, 0, 0))
+            self.win.blit(restart_text, (self.width // 2 - 120, 250))
+
+            self.man.draw(win)
 
         if self.dead_loop % 2 == 0:
             self.man.draw(win)
@@ -169,6 +177,13 @@ class Game(object):
 
         pygame.display.update()
 
+    def restart_check(self):
+        keys = pygame.key.get_pressed()
+
+        # restart game
+        if keys[pygame.K_r]:
+            self.initialize()
+
     def start(self):
         self.initialize()
 
@@ -177,7 +192,6 @@ class Game(object):
         time_t.start()
 
         # main loop
-        man = self.man
         run = True
         while run:
             self.clock.tick(27)
@@ -186,6 +200,13 @@ class Game(object):
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     run = False
+
+            self.redraw_game_window()
+
+            # game over
+            if self.time == 0 or self.man.lives == 0:
+                self.restart_check()
+                continue
 
             self.loop_check()
 
@@ -199,14 +220,14 @@ class Game(object):
 
             # goblins hit player
             for goblin in self.goblins:
-                if self.dead_loop > 0 or self.time == 0:
+                if self.dead_loop > 0:
                     break
 
-                if man.hitbox[1] < goblin.hitbox[1] + goblin.hitbox[3] and man.hitbox[1] + man.hitbox[3] > goblin.hitbox[1]:
-                    if man.hitbox[0] + man.hitbox[2] > goblin.hitbox[0] and man.hitbox[0] < goblin.hitbox[0] + goblin.hitbox[2]:
-                        self.hit_sound.play()
-                        man.hit(self.win)
-                        self.score -= 5
+                if self.man.hitbox[1] < goblin.hitbox[1] + goblin.hitbox[3] and self.man.hitbox[1] + self.man.hitbox[3] > goblin.hitbox[1]:
+                    if self.man.hitbox[0] + self.man.hitbox[2] > goblin.hitbox[0] and self.man.hitbox[0] < goblin.hitbox[0] + goblin.hitbox[2]:
+                        if self.effect_on:
+                            self.hit_sound.play()
+                        self.man.hit(self.win)
                         self.dead_loop = 1
 
             # bullets hit goblins
@@ -227,7 +248,5 @@ class Game(object):
             self.bullets = list(filter(lambda x: x.remove == False, self.bullets))
 
             self.handling_keys()
-
-            self.redraw_game_window()
 
         pygame.quit()

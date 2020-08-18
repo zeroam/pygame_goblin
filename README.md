@@ -25,3 +25,8 @@ Source code from : https://github.com/techwithtim/Pygame-Tutorials/tree/master/G
 - 버그 수정
   - 총알이 나가다 빈 값을 삭제하려해 발생하는 에러 수정
 - 타임 아웃 기능 추가
+
+
+### 2020/08/18
+- 목숨 추가: 목숨이 0이 되면 game over
+- 재시작 기능 추가 : TIME OUT, GAME OVER 시 R 버튼을 누르면 게임 재시작

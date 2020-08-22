@@ -39,7 +39,7 @@ class Game(object):
 
     def initialize(self):
         self.score = 0
-        self.time = 100
+        self.time = 60
 
         if self.bgm_on:
             pygame.mixer.music.play(-1)
@@ -49,18 +49,29 @@ class Game(object):
         self.goblins: List[Enemy] = []
         self.bullets: List[Projectile] = []
 
+        # round
+        self.round = 1
+        self.pass_score = 50
+
         # loops
         self.shoot_loop = 0
         self.shoot_interval = 5
         self.enemy_loop = 0
         self.enemy_interval = 30
         self.dead_loop = 0
-        self.dead_interval = 30
+        self.dead_interval = 40
         self.is_dead = False
 
         # limits
         self.bullets_limit = 5
         self.enemies_limit = 3
+        self.enemies_limit = 0
+
+    def next_round(self):
+        self.round += 1
+        self.pass_score += 50
+        self.time = 60
+        self.enemies_limit += 1
 
     def loop_check(self):
         # shoot loop
@@ -130,7 +141,6 @@ class Game(object):
                 man.isJump = False
                 man.jumpCount = 10
 
-
     def time_thread(self):
         while True:
             time.sleep(1)
@@ -150,6 +160,8 @@ class Game(object):
         win.blit(score_text, (self.width - 110, 10))
         time_text = self.font.render(f"TIME: {self.time}", 1, (0, 0, 0))
         win.blit(time_text, (self.width // 2 - 50, 10))
+        time_text = self.font.render(f"ROUND: {self.round}", 1, (255, 0, 0))
+        win.blit(time_text, (self.width // 2 - 50, 50))
         live_text = self.font.render(f"lives: {self.man.lives}", 1, (0, 0, 0))
         win.blit(live_text, (20, 10))
 
@@ -166,6 +178,7 @@ class Game(object):
 
             self.man.draw(win)
 
+
         if self.dead_loop % 2 == 0:
             self.man.draw(win)
 
@@ -174,6 +187,15 @@ class Game(object):
 
         for bullet in self.bullets:
             bullet.draw(win)
+
+        # round complete
+        if self.score >= self.pass_score:
+            round_complete_text = self.font_notify.render(f"ROUND {self.round} COMPLETE", 1, (255, 0, 0))
+            self.win.blit(round_complete_text, (self.width // 2 - 200, 100))
+            pygame.display.update()
+            time.sleep(3)
+            self.dead_loop = 1
+            self.next_round()
 
         pygame.display.update()
 

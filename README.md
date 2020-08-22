@@ -30,3 +30,7 @@ Source code from : https://github.com/techwithtim/Pygame-Tutorials/tree/master/G
 ### 2020/08/18
 - 목숨 추가: 목숨이 0이 되면 game over
 - 재시작 기능 추가 : TIME OUT, GAME OVER 시 R 버튼을 누르면 게임 재시작
+
+
+### 2020/08/19
+- 라운드 기능 추가: 1라운드 50점, 올라갈 때마다 50점 추가

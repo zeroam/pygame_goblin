@@ -65,7 +65,6 @@ class Game(object):
         # limits
         self.bullets_limit = 5
         self.enemies_limit = 3
-        self.enemies_limit = 0
 
     def next_round(self):
         self.round += 1
@@ -82,8 +81,8 @@ class Game(object):
             self.shoot_loop = 0
 
         # enemy loop
-        # if self.enemy_loop > 0:
-        #     self.enemy_loop += 1
+        if self.enemy_loop > 0:
+            self.enemy_loop += 1
 
         if self.enemy_loop > self.enemy_interval:
             self.enemy_loop = 0
